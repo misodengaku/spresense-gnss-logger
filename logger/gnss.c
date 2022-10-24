@@ -29,6 +29,8 @@ static int gnss_setparams(int fd);
 static int gnss_read(int fd);
 
 void gnss_init(){
+
+  boardctl(BOARDIOC_INIT, 0);
   gnss_fd = open("/dev/gps", O_RDONLY);
   if (gnss_fd < 0)
   {
@@ -36,7 +38,12 @@ void gnss_init(){
     return;
   }
 
-  ioctl(gnss_fd, CXD56_GNSS_IOCTL_STOP, 0);
+  int ret = ioctl(gnss_fd, CXD56_GNSS_IOCTL_STOP, 0);
+  if (ret < 0)
+  {
+    printf("ioctl(CXD56_GNSS_IOCTL_SIGNAL_SET) NG!! %d\n", ret);
+    return;
+  }
 
   board_gpio_config(LED_0, 0, false, true, 0);
   board_gpio_config(LED_1, 0, false, true, 0);
@@ -56,6 +63,7 @@ void gnss_loop(){
   if (ret<0) {
     return;
   }
+  printf("set_params ok\n");
 
   /* Set the signal to notify GNSS events. */
   setting.fd      = gnss_fd;
@@ -69,6 +77,7 @@ void gnss_loop(){
     printf("ioctl(CXD56_GNSS_IOCTL_SIGNAL_SET) NG!! %d\n", ret);
     return;
   }
+  printf("signal_set ok\n");
 
   sigemptyset(&mask);
   sigaddset(&mask, MY_GNSS_SIG);
@@ -106,6 +115,15 @@ static int gnss_setparams(int fd)
   uint32_t set_satellite;
   struct cxd56_gnss_ope_mode_param_s set_opemode;
 
+
+  ret = ioctl(fd, CXD56_GNSS_IOCTL_STOP, 0);
+  if (ret < 0)
+  {
+    printf("ioctl(CXD56_GNSS_IOCTL_SIGNAL_SET) NG!! %d\n", ret);
+    return;
+  }
+  printf("stop ok\n");
+
   /* Set the GNSS operation interval. */
 
   set_opemode.mode     = 1;     /* Operation mode:Normal(default). */
@@ -117,6 +135,7 @@ static int gnss_setparams(int fd)
     printf("ioctl(CXD56_GNSS_IOCTL_SET_OPE_MODE) NG!! %d\n", ret);
     return ret;
   }
+  printf("set_ope ok\n");
 
   /* Set the type of satellite system used by GNSS. */
   set_satellite = CXD56_GNSS_SAT_GPS | CXD56_GNSS_SAT_SBAS | CXD56_GNSS_SAT_QZ_L1CA | CXD56_GNSS_SAT_QZ_L1S;
@@ -127,14 +146,16 @@ static int gnss_setparams(int fd)
     printf("ioctl(CXD56_GNSS_IOCTL_SELECT_SATELLITE_SYSTEM) NG!! %d\n", ret);
     return ret;
   }
+  printf("select ok\n");
 
   /* Start GNSS. */
-  ret = ioctl(gnss_fd, CXD56_GNSS_IOCTL_START, CXD56_GNSS_STMOD_COLD);
+  ret = ioctl(fd, CXD56_GNSS_IOCTL_START, CXD56_GNSS_STMOD_COLD);
   if (ret < 0)
   {
     printf("ioctl(CXD56_GNSS_IOCTL_START) NG!! %d\n", ret);
     return ret;
   }
+  printf("start ok\n");
 
   return ret;
 }
